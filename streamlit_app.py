@@ -114,19 +114,23 @@ if refresh:
     except Exception as e:
         st.error(str(e))
 
+# Move mode selector OUTSIDE the form so changing it updates the persona list immediately
+mode = st.radio(
+    "Mode",
+    options=["normal", "impersonation"],
+    index=0 if st.session_state.get("mode", "normal") == "normal" else 1,
+    horizontal=True,
+    key="mode",
+    help="Normal: preset personas. Impersonation: dynamically cloned voices (refresh after a call).",
+)
+
 with st.form("place_call_form", clear_on_submit=False, border=True):
     ph = st.text_input("Target phone (E.164)", placeholder="+15551234567")
     name = st.text_input("Target name", placeholder="Jane Doe")
-    mode = st.radio(
-        "Mode",
-        options=["normal", "impersonation"],
-        index=0,
-        horizontal=True,
-        help="Normal: preset personas. Impersonation: dynamically cloned voices (refresh after a call).",
-    )
-
+    # Use the selected mode from session state so the selectbox updates on toggle
     personas = st.session_state.get("personas", {"normal": [], "impersonation": []})
-    persona_choices = personas.get(mode) or []
+    current_mode = st.session_state.get("mode", "normal")
+    persona_choices = personas.get(current_mode) or []
     disabled = len(persona_choices) == 0
     persona = st.selectbox(
         "Persona",
@@ -149,12 +153,12 @@ with st.form("place_call_form", clear_on_submit=False, border=True):
         else:
             with st.spinner("Placing call…"):
                 try:
-                    result = place_call(ph=ph.strip(), name=name.strip(), persona=persona, mode=mode)
+                    result = place_call(ph=ph.strip(), name=name.strip(), persona=persona, mode=current_mode)
                 except Exception as e:
                     st.error(str(e))
                 else:
                     st.success("Call requested. You should receive the call shortly.")
                     st.toast("Call created on server", icon="✅")
                     with st.expander("Request details"):
-                        st.json({"ph": ph.strip(), "name": name.strip(), "persona": persona, "mode": mode})
+                        st.json({"ph": ph.strip(), "name": name.strip(), "persona": persona, "mode": current_mode})
 
