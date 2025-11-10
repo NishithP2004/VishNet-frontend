@@ -99,97 +99,62 @@ if "personas" not in st.session_state:
         st.error(str(e))
 
 
-col1, col2 = st.columns([1, 1], gap="large")
+st.subheader("Place a call")
+st.write(
+    "Fill in the target details, choose a mode and persona, then press Place call."
+)
 
+# Lightweight refresh button to re-fetch personas (for new impersonation voices)
+refresh = st.button("Refresh personas", help="Refetch personas (normal & impersonation) from the server")
+if refresh:
+    try:
+        with st.spinner("Refreshing personas…"):
+            st.session_state["personas"] = refresh_personas()
+        st.toast("Personas refreshed", icon="🔄")
+    except Exception as e:
+        st.error(str(e))
 
-with col1:
-    st.subheader("Place a call")
-    st.write(
-        "Fill in the target details, choose a mode and persona, then press Place call."
+with st.form("place_call_form", clear_on_submit=False, border=True):
+    ph = st.text_input("Target phone (E.164)", placeholder="+15551234567")
+    name = st.text_input("Target name", placeholder="Jane Doe")
+    mode = st.radio(
+        "Mode",
+        options=["normal", "impersonation"],
+        index=0,
+        horizontal=True,
+        help="Normal: preset personas. Impersonation: dynamically cloned voices (refresh after a call).",
     )
-
-    with st.form("place_call_form", clear_on_submit=False, border=True):
-        ph = st.text_input("Target phone (E.164)", placeholder="+15551234567")
-        name = st.text_input("Target name", placeholder="Jane Doe")
-        mode = st.radio(
-            "Mode",
-            options=["normal", "impersonation"],
-            index=0,
-            horizontal=True,
-            help="Normal: use preset personas. Impersonation: use dynamically cloned voices.",
-        )
-
-        personas = st.session_state.get("personas", {"normal": [], "impersonation": []})
-        persona_choices = personas.get(mode) or []
-
-        disabled = len(persona_choices) == 0
-        persona = st.selectbox(
-            "Persona",
-            persona_choices if not disabled else ["(No personas available)"],
-            index=0,
-            disabled=disabled,
-            help=(
-                "Choose the agent persona. Use Refresh personas if you just created a new one."
-            ),
-        )
-
-        submitted = st.form_submit_button("Place call", type="primary")
-
-        if submitted:
-            # Validate inputs
-            ok, msg = validate_phone(ph)
-            if not ok:
-                st.error(msg)
-            elif not name.strip():
-                st.error("Name is required.")
-            elif disabled:
-                st.error("No personas available for the selected mode.")
-            else:
-                with st.spinner("Placing call…"):
-                    try:
-                        result = place_call(ph=ph.strip(), name=name.strip(), persona=persona, mode=mode)
-                    except Exception as e:
-                        st.error(str(e))
-                    else:
-                        st.success("Call requested. You should receive the call shortly.")
-                        st.toast("Call created on server", icon="✅")
-                        with st.expander("Request details"):
-                            st.json({"ph": ph.strip(), "name": name.strip(), "persona": persona, "mode": mode})
-
-
-with col2:
-    st.subheader("Available personas")
-    st.write(
-        "These are fetched from the server. Impersonation personas appear after a call is processed and a voice clone is created."
-    )
-
-    refresh = st.button("Refresh personas", use_container_width=False)
-    if refresh:
-        try:
-            with st.spinner("Refreshing…"):
-                st.session_state["personas"] = refresh_personas()
-            st.toast("Personas refreshed", icon="🔄")
-        except Exception as e:
-            st.error(str(e))
 
     personas = st.session_state.get("personas", {"normal": [], "impersonation": []})
-    n_normal = len(personas.get("normal") or [])
-    n_imp = len(personas.get("impersonation") or [])
+    persona_choices = personas.get(mode) or []
+    disabled = len(persona_choices) == 0
+    persona = st.selectbox(
+        "Persona",
+        persona_choices if not disabled else ["(No personas available)"],
+        index=0,
+        disabled=disabled,
+        help="Select a persona. Use the Refresh button after a successful call to load new impersonation voices.",
+    )
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"**Normal personas** ({n_normal})")
-        if n_normal:
-            for p in personas["normal"]:
-                st.write(f"• {p}")
-        else:
-            st.caption("No normal personas available.")
+    submitted = st.form_submit_button("Place call", type="primary")
 
-    with c2:
-        st.markdown(f"**Impersonation personas** ({n_imp})")
-        if n_imp:
-            for p in personas["impersonation"]:
-                st.write(f"• {p}")
+    if submitted:
+        ok, msg = validate_phone(ph)
+        if not ok:
+            st.error(msg)
+        elif not name.strip():
+            st.error("Name is required.")
+        elif disabled:
+            st.error("No personas available for the selected mode. Try Refresh personas.")
         else:
-            st.caption("No impersonation personas available yet.")
+            with st.spinner("Placing call…"):
+                try:
+                    result = place_call(ph=ph.strip(), name=name.strip(), persona=persona, mode=mode)
+                except Exception as e:
+                    st.error(str(e))
+                else:
+                    st.success("Call requested. You should receive the call shortly.")
+                    st.toast("Call created on server", icon="✅")
+                    with st.expander("Request details"):
+                        st.json({"ph": ph.strip(), "name": name.strip(), "persona": persona, "mode": mode})
 
