@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import requests
 import streamlit as st
@@ -57,9 +57,17 @@ def validate_phone(ph: str) -> tuple[bool, str]:
     return True, ""
 
 
-def place_call(ph: str, name: str, persona: str, mode: str) -> dict:
+def place_call(
+    ph: str,
+    name: str,
+    persona: str,
+    mode: str,
+    voice_id: Optional[str] = None,
+) -> dict:
     """POST /call to initiate a vishing simulation call."""
     payload = {"ph": ph, "name": name, "persona": persona, "mode": mode}
+    if voice_id:
+        payload["voice_id"] = voice_id
     try:
         resp = requests.post(f"{BACKEND_BASE_URL}/call", json=payload, timeout=30)
         # Try reading JSON either way for helpful messages
@@ -140,6 +148,22 @@ with st.form("place_call_form", clear_on_submit=False, border=True):
         help="Select a persona. Use the Refresh button after a successful call to load new impersonation voices.",
     )
 
+    # Optional ElevenLabs voice ID for normal mode only
+    is_normal_mode = current_mode == "normal"
+    voice_id = st.text_input(
+        "ElevenLabs voice ID (optional)",
+        value=("UgBBYS2sOqTuMpoF3BR0" if is_normal_mode else ""),
+        placeholder="UgBBYS2sOqTuMpoF3BR0",
+        disabled=not is_normal_mode,
+        help=(
+            "Provide a specific voice for normal mode."
+        ),
+    )
+    if is_normal_mode:
+        st.caption(
+            "Reference: Twilio TTS voices and languages – https://www.twilio.com/docs/voice/twiml/say/text-speech#available-voices-and-languages"
+        )
+
     submitted = st.form_submit_button("Place call", type="primary")
 
     if submitted:
@@ -153,12 +177,27 @@ with st.form("place_call_form", clear_on_submit=False, border=True):
         else:
             with st.spinner("Placing call…"):
                 try:
-                    result = place_call(ph=ph.strip(), name=name.strip(), persona=persona, mode=current_mode)
+                    to_send_voice = voice_id.strip() if (is_normal_mode and voice_id and voice_id.strip()) else None
+                    result = place_call(
+                        ph=ph.strip(),
+                        name=name.strip(),
+                        persona=persona,
+                        mode=current_mode,
+                        voice_id=to_send_voice,
+                    )
                 except Exception as e:
                     st.error(str(e))
                 else:
                     st.success("Call requested. You should receive the call shortly.")
                     st.toast("Call created on server", icon="✅")
                     with st.expander("Request details"):
-                        st.json({"ph": ph.strip(), "name": name.strip(), "persona": persona, "mode": current_mode})
+                        details = {
+                            "ph": ph.strip(),
+                            "name": name.strip(),
+                            "persona": persona,
+                            "mode": current_mode,
+                        }
+                        if to_send_voice:
+                            details["voice_id"] = to_send_voice
+                        st.json(details)
 
