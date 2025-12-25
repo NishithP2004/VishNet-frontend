@@ -164,6 +164,17 @@ with st.form("place_call_form", clear_on_submit=False, border=True):
             "Reference: Twilio TTS voices and languages – https://www.twilio.com/docs/voice/twiml/say/text-speech#available-voices-and-languages"
         )
 
+    st.markdown(
+        "**Consent notice**"
+    )
+    st.info(
+        "By placing this vishing simulation call, you confirm you have permission to contact the target number and that all participants consent to training/assessment."
+    )
+    consent_ack = st.checkbox(
+        "I understand and have obtained consent to run this simulation.",
+        help="Required before submitting."
+    )
+
     submitted = st.form_submit_button("Place call", type="primary")
 
     if submitted:
@@ -172,6 +183,8 @@ with st.form("place_call_form", clear_on_submit=False, border=True):
             st.error(msg)
         elif not name.strip():
             st.error("Name is required.")
+        elif not consent_ack:
+            st.error("Please acknowledge consent before placing the call.")
         elif disabled:
             st.error("No personas available for the selected mode. Try Refresh personas.")
         else:
